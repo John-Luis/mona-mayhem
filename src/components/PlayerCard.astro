@@ -1,0 +1,92 @@
+---
+import ContributionGrid from './ContributionGrid.astro';
+import StatsPanel from './StatsPanel.astro';
+
+const { player, label } = Astro.props;
+---
+
+<article class="player-card" data-player-card={player}>
+	<header class="player-header">
+		<img data-avatar alt="" width="64" height="64" loading="lazy" />
+		<div>
+			<p class="player-label">{label}</p>
+			<a data-profile-link href="#" rel="noreferrer" target="_blank">
+				<span data-username>Waiting for battle</span>
+			</a>
+		</div>
+	</header>
+
+	<section aria-labelledby={`${player}-grid-title`}>
+		<h3 id={`${player}-grid-title`}>Contribution calendar</h3>
+		<ContributionGrid player={player} />
+	</section>
+
+	<section aria-labelledby={`${player}-stats-title`}>
+		<h3 id={`${player}-stats-title`}>Battle stats</h3>
+		<StatsPanel player={player} />
+	</section>
+</article>
+
+<style>
+	.player-card {
+		padding: 1.25rem;
+		border: 2px solid var(--player-accent);
+		border-radius: 0.2rem;
+		background: linear-gradient(145deg, rgba(17,19,37,0.98), rgba(10,10,18,0.98));
+		box-shadow: 0 0 14px var(--player-glow), inset 0 0 20px rgba(255,255,255,0.025);
+		animation: card-shine 5s ease-in-out infinite;
+		position: relative;
+	}
+
+	.player-card[data-player-card='player1'] {
+		--player-accent: #38f5ff;
+		--player-glow: rgba(56,245,255,0.35);
+	}
+
+	.player-card[data-player-card='player2'] {
+		--player-accent: #ff3bd4;
+		--player-glow: rgba(255,59,212,0.35);
+	}
+
+	.player-header {
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+	}
+
+	.player-header img {
+		border-radius: 50%;
+		border: 2px solid var(--player-accent);
+		box-shadow: 0 0 10px var(--player-accent);
+		background: #17192a;
+	}
+
+	.player-label {
+		margin: 0 0 0.25rem;
+		color: var(--player-accent);
+		font-size: 0.75rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	.player-header a {
+		color: #fff;
+		font-size: 1.25rem;
+		font-weight: 800;
+		text-shadow: 0 0 7px var(--player-accent);
+	}
+
+	h3 {
+		margin: 1.5rem 0 0.5rem;
+		font-size: 1rem;
+		color: var(--player-accent);
+		font-family: 'Press Start 2P', monospace;
+		font-size: 0.7rem;
+	}
+
+	@keyframes card-shine {
+		0%, 85%, 100% { box-shadow: 0 0 14px var(--player-glow), inset 0 0 20px rgba(255,255,255,0.025); }
+		90% { box-shadow: 0 0 24px var(--player-accent), inset 0 0 20px rgba(255,255,255,0.06); }
+	}
+</style>

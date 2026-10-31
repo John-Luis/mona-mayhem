@@ -1,0 +1,93 @@
+---
+---
+
+<section id="scoreboard" class="scoreboard" aria-labelledby="scoreboard-title" hidden>
+	<p class="eyebrow">Battle result</p>
+	<h2 id="scoreboard-title" data-winner-banner>Ready?</h2>
+	<p data-score-summary></p>
+	<table class="score-table">
+		<caption>Category battle results</caption>
+		<thead>
+			<tr>
+				<th scope="col">Category</th>
+				<th scope="col">Player 1</th>
+				<th scope="col">Player 2</th>
+				<th scope="col">Points</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-score-row="total">
+				<th scope="row">Total contributions <span>(30 pts)</span></th>
+				<td data-score-value="player1"></td>
+				<td data-score-value="player2"></td>
+				<td data-score-points></td>
+			</tr>
+			<tr data-score-row="longestStreak">
+				<th scope="row">Longest streak <span>(20 pts)</span></th>
+				<td data-score-value="player1"></td>
+				<td data-score-value="player2"></td>
+				<td data-score-points></td>
+			</tr>
+			<tr data-score-row="currentStreak">
+				<th scope="row">Current streak <span>(15 pts)</span></th>
+				<td data-score-value="player1"></td>
+				<td data-score-value="player2"></td>
+				<td data-score-points></td>
+			</tr>
+			<tr data-score-row="peak">
+				<th scope="row">Most active day <span>(20 pts)</span></th>
+				<td data-score-value="player1"></td>
+				<td data-score-value="player2"></td>
+				<td data-score-points></td>
+			</tr>
+			<tr data-score-row="consistency">
+				<th scope="row">Consistency <span>(15 pts)</span></th>
+				<td data-score-value="player1"></td>
+				<td data-score-value="player2"></td>
+				<td data-score-points></td>
+			</tr>
+		</tbody>
+	</table>
+</section>
+
+<style>
+	.scoreboard {
+		margin-top: 1rem;
+		padding: 1.5rem;
+		border: 2px solid #ffd166;
+		border-radius: 0.75rem;
+		background: linear-gradient(145deg, rgba(25,29,56,0.96), rgba(10,10,18,0.96));
+		box-shadow: 0 0 16px rgba(255,209,102,0.35);
+		text-align: center;
+	}
+
+	.scoreboard h2 { margin-bottom: 0.5rem; }
+
+	.score-table {
+		width: 100%;
+		margin-top: 1.25rem;
+		border-collapse: collapse;
+		text-align: left;
+	}
+
+	th, td {
+		padding: 0.75rem 0.5rem;
+		border-top: 1px solid rgba(255,209,102,0.25);
+	}
+
+	thead th {
+		color: #ffd166;
+		font-family: 'Press Start 2P', monospace;
+		font-size: 0.75rem;
+		text-transform: uppercase;
+	}
+
+	tbody th span { color: #9da3c7; font-size: 0.75rem; font-weight: 400; }
+	td { text-align: center; }
+	td[data-winner='true'] { background: rgba(95,237,131,0.16); color: #5fed83; font-weight: 800; text-shadow: 0 0 5px #5fed83; }
+	td[data-tie='true'] { background: rgba(255,209,102,0.16); color: #ffd166; font-weight: 800; text-shadow: 0 0 5px #ffd166; }
+	@media (max-width: 600px) {
+		.score-table { font-size: 0.8rem; }
+		th, td { padding: 0.6rem 0.25rem; }
+	}
+</style>

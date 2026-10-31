@@ -1,0 +1,44 @@
+---
+const { player } = Astro.props;
+---
+
+<dl class="stats-panel" data-stats-panel={player}>
+	<div><dt>Total contributions</dt><dd data-stat="total">—</dd></div>
+	<div><dt>Longest streak</dt><dd data-stat="longestStreak">—</dd></div>
+	<div><dt>Current streak</dt><dd data-stat="currentStreak">—</dd></div>
+	<div><dt>Peak day</dt><dd data-stat="peakDay">—</dd></div>
+	<div><dt>Consistency</dt><dd data-stat="consistency">—</dd></div>
+</dl>
+
+<style>
+	.stats-panel {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+		margin: 1rem 0 0;
+	}
+
+	.stats-panel div {
+		padding: 0.75rem;
+		border: 1px solid color-mix(in srgb, var(--player-accent) 45%, transparent);
+		border-radius: 0.1rem;
+		background: rgba(0,0,0,0.18);
+	}
+
+	.stats-panel div:last-child {
+		grid-column: 1 / -1;
+	}
+
+	dt {
+		color: #9da3c7;
+		font-size: 0.75rem;
+	}
+
+	dd {
+		margin: 0.25rem 0 0;
+		color: var(--player-accent);
+		font-family: 'JetBrains Mono', monospace;
+		font-weight: 700;
+		text-shadow: 0 0 5px var(--player-accent);
+	}
+</style>
