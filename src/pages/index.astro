@@ -1,5 +1,6 @@
 ---
-
+import PlayerCard from '../components/PlayerCard.astro';
+import Scoreboard from '../components/Scoreboard.astro';
 ---
 
 <html lang="en">
@@ -8,10 +9,387 @@
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
 		<title>Mona Mayhem</title>
 	</head>
 	<body>
-		<h1>Mona Mayhem</h1>
-		<p>Welcome to Mona Mayhem! Time to build a GitHub Contribution Battle Arena.</p>
+		<main class="page-shell">
+			<header class="hero">
+				<p class="eyebrow">GitHub Contribution Battle Arena</p>
+				<h1>Mona Mayhem</h1>
+				<p>Choose two GitHub users and find out who owns the contribution grid.</p>
+			</header>
+
+			<section class="setup-panel" aria-labelledby="setup-title">
+				<h2 id="setup-title">Choose your players</h2>
+				<form id="battle-form">
+					<div class="player-inputs">
+						<label>
+							Player 1
+							<input id="player-1" name="player-1" autocomplete="off" required />
+						</label>
+						<label>
+							Player 2
+							<input id="player-2" name="player-2" autocomplete="off" required />
+						</label>
+					</div>
+					<button type="submit" id="battle-button">BATTLE!</button>
+				</form>
+				<div class="preset-matchups" aria-label="Quick matchups">
+					<p>Quick matchups</p>
+					<button type="button" class="preset-button" data-player-one="torvalds" data-player-two="gaearon">
+						torvalds vs. gaearon
+					</button>
+					<button type="button" class="preset-button" data-player-one="octocat" data-player-two="sindresorhus">
+						octocat vs. sindresorhus
+					</button>
+				</div>
+			</section>
+
+			<section id="status" class="status" data-state="ready" aria-live="polite">INSERT COIN / READY PLAYER 1</section>
+
+			<Scoreboard />
+
+			<section id="arena" class="arena" aria-label="Contribution battle arena" hidden>
+				<PlayerCard player="player1" label="Player 1" />
+				<div class="versus" aria-hidden="true">VS</div>
+				<PlayerCard player="player2" label="Player 2" />
+			</section>
+		</main>
 	</body>
 </html>
+
+<script>
+	interface ContributionDay {
+		date: string;
+		count: number;
+		level: number;
+	}
+
+	interface ContributionData {
+		username: string;
+		total: number;
+		weeks: { days: ContributionDay[] }[];
+	}
+
+	interface PlayerStats {
+		total: number;
+		longestStreak: number;
+		currentStreak: number;
+		peakCount: number;
+		peakDate: string;
+		consistency: number;
+	}
+
+	type ScoreMetric = 'total' | 'longestStreak' | 'currentStreak' | 'peakCount' | 'consistency';
+
+	const SCORE_WEIGHTS: Record<ScoreMetric, number> = {
+		total: 30,
+		longestStreak: 20,
+		currentStreak: 15,
+		peakCount: 20,
+		consistency: 15,
+	};
+
+	const form = document.querySelector<HTMLFormElement>('#battle-form');
+	const button = document.querySelector<HTMLButtonElement>('#battle-button');
+	const playerOneInput = document.querySelector<HTMLInputElement>('#player-1');
+	const playerTwoInput = document.querySelector<HTMLInputElement>('#player-2');
+	const status = document.querySelector<HTMLElement>('#status');
+	const scoreboard = document.querySelector<HTMLElement>('#scoreboard');
+	const arena = document.querySelector<HTMLElement>('#arena');
+
+	const getDays = (data: ContributionData) => data.weeks.flatMap((week) => week.days);
+
+	const calculateStats = (data: ContributionData): PlayerStats => {
+		const days = getDays(data);
+		let longestStreak = 0;
+		let streak = 0;
+		let peakDay = days[0];
+
+		for (const day of days) {
+			if (day.count > 0) {
+				streak += 1;
+				longestStreak = Math.max(longestStreak, streak);
+			} else {
+				streak = 0;
+			}
+
+			if (day.count > (peakDay?.count ?? 0)) peakDay = day;
+		}
+
+		let currentStreak = 0;
+		for (const day of [...days].reverse()) {
+			if (day.count === 0) break;
+			currentStreak += 1;
+		}
+
+		const activeDays = days.filter((day) => day.count > 0).length;
+		return {
+			total: data.total,
+			longestStreak,
+			currentStreak,
+			peakCount: peakDay?.count ?? 0,
+			peakDate: peakDay?.date ?? 'No contributions',
+			consistency: days.length ? Math.round((activeDays / days.length) * 100) : 0,
+		};
+	};
+
+	const setStatus = (message: string, isError = false) => {
+		if (!status) return;
+		status.hidden = !message;
+		status.textContent = message;
+		status.dataset.error = String(isError);
+		status.dataset.state = isError ? 'error' : message ? 'loading' : 'idle';
+	};
+
+	const showLoadingSkeletons = () => {
+		for (const grid of document.querySelectorAll<HTMLElement>('[data-contribution-grid]')) {
+			grid.replaceChildren(
+				...Array.from({ length: 52 * 7 }, (_, index) => {
+					const cell = document.createElement('span');
+					cell.className = 'day skeleton';
+					cell.setAttribute('aria-hidden', 'true');
+					cell.dataset.skeleton = String(index);
+					cell.style.gridColumn = String(Math.floor(index / 7) + 1);
+					cell.style.gridRow = String((index % 7) + 1);
+					return cell;
+				}),
+			);
+		}
+	};
+
+	const renderPlayer = (slot: string, data: ContributionData, stats: PlayerStats) => {
+		const card = document.querySelector<HTMLElement>(`[data-player-card="${slot}"]`);
+		if (!card) return;
+
+		const avatar = card.querySelector<HTMLImageElement>('[data-avatar]');
+		const profileLink = card.querySelector<HTMLAnchorElement>('[data-profile-link]');
+		const username = card.querySelector<HTMLElement>('[data-username]');
+		if (avatar) {
+			avatar.src = `https://github.com/${encodeURIComponent(data.username)}.png?size=128`;
+			avatar.alt = `${data.username} avatar`;
+		}
+		if (profileLink) profileLink.href = `https://github.com/${encodeURIComponent(data.username)}`;
+		if (username) username.textContent = data.username;
+
+		const grid = card.querySelector<HTMLElement>('[data-contribution-grid]');
+		if (grid) {
+			grid.replaceChildren(
+				...data.weeks.flatMap((week, weekIndex) => week.days.map((day, dayIndex) => {
+					const cell = document.createElement('span');
+					cell.className = 'day';
+					cell.dataset.level = String(day.level);
+					cell.title = `${day.date}: ${day.count} contributions`;
+					cell.setAttribute('aria-label', cell.title);
+					cell.style.gridColumn = String(weekIndex + 1);
+					cell.style.gridRow = String(dayIndex + 1);
+					return cell;
+				})),
+			);
+		}
+
+		const statsPanel = card.querySelector<HTMLElement>('[data-stats-panel]');
+		if (statsPanel) {
+			const values = {
+				total: String(stats.total),
+				longestStreak: `${stats.longestStreak} days`,
+				currentStreak: `${stats.currentStreak} days`,
+				peakDay: stats.peakCount ? `${stats.peakCount} on ${stats.peakDate}` : 'No contributions',
+				consistency: `${stats.consistency}%`,
+			};
+			for (const [key, value] of Object.entries(values)) {
+				const element = statsPanel.querySelector<HTMLElement>(`[data-stat="${key}"]`);
+				if (element) element.textContent = value;
+			}
+		}
+	};
+
+	const renderScoreboard = (
+		first: ContributionData,
+		second: ContributionData,
+		firstStats: PlayerStats,
+		secondStats: PlayerStats,
+	) => {
+		const rows: { key: ScoreMetric; first: string; second: string }[] = [
+			{ key: 'total', first: String(firstStats.total), second: String(secondStats.total) },
+			{ key: 'longestStreak', first: `${firstStats.longestStreak} days`, second: `${secondStats.longestStreak} days` },
+			{ key: 'currentStreak', first: `${firstStats.currentStreak} days`, second: `${secondStats.currentStreak} days` },
+			{ key: 'peakCount', first: `${firstStats.peakCount} on ${firstStats.peakDate}`, second: `${secondStats.peakCount} on ${secondStats.peakDate}` },
+			{ key: 'consistency', first: `${firstStats.consistency}%`, second: `${secondStats.consistency}%` },
+		];
+		let firstScore = 0;
+		let secondScore = 0;
+
+		for (const row of rows) {
+			const element = document.querySelector<HTMLElement>(`[data-score-row="${row.key === 'peakCount' ? 'peak' : row.key}"]`);
+			if (!element) continue;
+			const firstCell = element.querySelector<HTMLElement>('[data-score-value="player1"]');
+			const secondCell = element.querySelector<HTMLElement>('[data-score-value="player2"]');
+			const pointsCell = element.querySelector<HTMLElement>('[data-score-points]');
+			const firstValue = firstStats[row.key];
+			const secondValue = secondStats[row.key];
+			const winner = firstValue === secondValue ? 'tie' : firstValue > secondValue ? 'player1' : 'player2';
+
+			if (firstCell) {
+				firstCell.textContent = row.first;
+				firstCell.dataset.winner = String(winner === 'player1');
+				firstCell.dataset.tie = String(winner === 'tie');
+			}
+			if (secondCell) {
+				secondCell.textContent = row.second;
+				secondCell.dataset.winner = String(winner === 'player2');
+				secondCell.dataset.tie = String(winner === 'tie');
+			}
+			if (pointsCell) pointsCell.textContent = winner === 'tie' ? 'Tie' : `${SCORE_WEIGHTS[row.key]} pts`;
+			if (winner === 'player1') firstScore += SCORE_WEIGHTS[row.key];
+			if (winner === 'player2') secondScore += SCORE_WEIGHTS[row.key];
+		}
+
+		const banner = scoreboard?.querySelector<HTMLElement>('[data-winner-banner]');
+		const summary = scoreboard?.querySelector<HTMLElement>('[data-score-summary]');
+		if (banner) {
+			banner.textContent = firstScore === secondScore
+				? 'IT’S A TIE!'
+				: `${firstScore > secondScore ? first.username : second.username} WINS!`;
+		}
+		if (summary) {
+			summary.textContent = `Battle Score: ${first.username} ${firstScore} — ${secondScore} ${second.username}`;
+		}
+	};
+
+	const fetchContributions = async (username: string) => {
+		const response = await fetch(`/api/contributions/${encodeURIComponent(username)}`);
+		const body = (await response.json()) as ContributionData & { error?: string };
+		if (response.status === 404) throw new Error(`GitHub user "${username}" was not found.`);
+		if (!response.ok) throw new Error(body.error ?? `Unable to load contributions for "${username}".`);
+		return body;
+	};
+
+	const runBattle = async () => {
+		const playerOne = playerOneInput?.value.trim() ?? '';
+		const playerTwo = playerTwoInput?.value.trim() ?? '';
+		if (!playerOne || !playerTwo) {
+			setStatus('Enter both GitHub usernames to start the battle.', true);
+			return;
+		}
+
+		if (button) button.disabled = true;
+		if (scoreboard) scoreboard.hidden = true;
+		if (arena) arena.hidden = false;
+		showLoadingSkeletons();
+		setStatus('Loading contribution grids...');
+
+		try {
+			const [first, second] = await Promise.all([fetchContributions(playerOne), fetchContributions(playerTwo)]);
+			const firstStats = calculateStats(first);
+			const secondStats = calculateStats(second);
+
+			renderPlayer('player1', first, firstStats);
+			renderPlayer('player2', second, secondStats);
+			renderScoreboard(first, second, firstStats, secondStats);
+			if (scoreboard) {
+				scoreboard.hidden = false;
+			}
+			if (arena) arena.hidden = false;
+			setStatus('');
+		} catch (error) {
+			setStatus(error instanceof Error ? error.message : 'Unable to complete the battle.', true);
+		} finally {
+			if (button) button.disabled = false;
+		}
+	};
+
+	form?.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		await runBattle();
+	});
+
+	document.querySelectorAll<HTMLButtonElement>('.preset-button').forEach((preset) => {
+		preset.addEventListener('click', () => {
+			if (playerOneInput) playerOneInput.value = preset.dataset.playerOne ?? '';
+			if (playerTwoInput) playerTwoInput.value = preset.dataset.playerTwo ?? '';
+			form?.requestSubmit();
+		});
+	});
+</script>
+
+<style>
+	:global(*) { box-sizing: border-box; }
+	:global(:root) {
+		--bg: #0a0a12;
+		--panel: #111325;
+		--panel-bright: #191d38;
+		--cyan: #38f5ff;
+		--green: #5fed83;
+		--magenta: #ff3bd4;
+		--gold: #ffd166;
+		--purple: #8a2be2;
+		--muted: #9da3c7;
+	}
+	:global(body) {
+		margin: 0;
+		min-height: 100vh;
+		background: var(--bg);
+		color: #f7f7ff;
+		font-family: 'JetBrains Mono', monospace;
+		position: relative;
+	}
+	:global(body::before) {
+		background: repeating-linear-gradient(to bottom, transparent 0, transparent 3px, rgba(255,255,255,0.035) 4px, transparent 5px);
+		content: '';
+		inset: 0;
+		pointer-events: none;
+		position: fixed;
+		z-index: 20;
+	}
+	:global(body::after) {
+		background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.72) 100%);
+		content: '';
+		inset: 0;
+		pointer-events: none;
+		position: fixed;
+		z-index: 19;
+	}
+	.page-shell { position: relative; z-index: 1; width: min(1180px, calc(100% - 2rem)); margin: 0 auto; padding: 3rem 0 5rem; }
+	.hero, .setup-panel, .scoreboard { text-align: center; }
+	.hero { margin-bottom: 2rem; animation: float-in 0.7s ease-out both; }
+	h1, h2, .eyebrow, button { font-family: 'Press Start 2P', monospace; }
+	h1 { color: var(--gold); font-size: clamp(2rem, 7vw, 5rem); letter-spacing: 0.05em; margin: 0.7rem 0 1rem; text-shadow: 0 0 8px var(--gold), 0 0 24px #ff8c00; animation: neon-pulse 3s ease-in-out infinite; }
+	h2 { margin-top: 0; }
+	.hero > p:last-child { color: var(--muted); }
+	.eyebrow { color: var(--green); font-size: 0.65rem; letter-spacing: 0.12em; text-shadow: 0 0 8px var(--green); text-transform: uppercase; }
+	.setup-panel, .scoreboard { padding: 1.5rem; border: 2px solid var(--purple); border-radius: 0.25rem; background: linear-gradient(145deg, rgba(25,29,56,0.96), rgba(10,10,18,0.96)); box-shadow: 0 0 12px rgba(138,43,226,0.45), inset 0 0 20px rgba(138,43,226,0.08); }
+	.setup-panel { animation: float-in 0.8s 0.1s ease-out both; }
+	.player-inputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; text-align: left; }
+	label { display: grid; gap: 0.4rem; color: var(--green); font-family: 'Press Start 2P', monospace; font-size: 0.65rem; }
+	input { width: 100%; padding: 0.9rem; border: 1px solid var(--green); border-radius: 0; background: #070810; box-shadow: inset 0 0 10px rgba(95,237,131,0.12); color: #fff; font: inherit; outline: none; }
+	input:focus { box-shadow: 0 0 10px var(--green), inset 0 0 10px rgba(95,237,131,0.2); }
+	button { margin-top: 1.25rem; padding: 0.85rem 1.5rem; border: 2px solid var(--gold); border-radius: 0; background: #27144a; color: var(--gold); cursor: pointer; font-size: 0.7rem; text-shadow: 0 0 7px var(--gold); transition: 0.2s ease; }
+	button:hover:not(:disabled), button:focus-visible { background: var(--purple); box-shadow: 0 0 18px var(--purple); transform: translateY(-2px); }
+	button:disabled { cursor: wait; opacity: 0.6; }
+	.preset-matchups { margin-top: 1.25rem; }
+	.preset-matchups p { margin: 0 0 0.5rem; color: var(--muted); font-size: 0.75rem; }
+	.preset-button { margin: 0 0.35rem 0.35rem; padding: 0.55rem 0.8rem; border-color: var(--cyan); background: transparent; color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; text-shadow: 0 0 6px var(--cyan); }
+	.preset-button:hover { background: rgba(56,245,255,0.15); box-shadow: 0 0 14px var(--cyan); }
+	.status { margin: 1rem 0; padding: 0.9rem; border: 1px solid var(--green); color: var(--green); font-family: 'Press Start 2P', monospace; font-size: 0.65rem; text-align: center; text-shadow: 0 0 8px var(--green); }
+	.status[data-state='ready'] { animation: blink 1.1s steps(2, start) infinite; }
+	.status[data-state='loading'] { color: var(--gold); border-color: var(--gold); animation: blink 0.8s steps(2, start) infinite; }
+	.status[data-error='true'] { border-color: var(--magenta); color: var(--magenta); text-shadow: 0 0 8px var(--magenta); }
+	.scoreboard { margin-top: 1rem; }
+	.scoreboard h2 { color: var(--gold); font-size: clamp(1rem, 3vw, 1.5rem); text-shadow: 0 0 10px var(--gold); }
+	.arena { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 1rem; margin-top: 1rem; }
+	.versus { align-self: center; color: var(--magenta); font-family: 'Press Start 2P', monospace; font-size: 1.5rem; text-shadow: 0 0 8px var(--magenta); animation: versus-pulse 1.4s ease-in-out infinite; }
+	@keyframes blink { 50% { opacity: 0.35; } }
+	@keyframes neon-pulse { 50% { text-shadow: 0 0 4px var(--gold), 0 0 14px #ff8c00; } }
+	@keyframes versus-pulse { 50% { transform: scale(1.15) rotate(-3deg); } }
+	@keyframes float-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+	@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
+	@media (max-width: 760px) {
+		.player-inputs, .arena { grid-template-columns: 1fr; }
+		.versus { order: 1; text-align: center; }
+		.arena > :not(.versus) { order: 2; }
+	}
+</style>
